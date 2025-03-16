@@ -98,9 +98,22 @@ export function ShiftList() {
     }
   };
 
-  const filteredShifts = shifts.filter(shift => 
-    isEqual(parseISO(shift.date), parseISO(selectedDate))
-  );
+  // Filter shifts by selected date and sort by startTime
+  const filteredShifts = shifts
+    .filter(shift => isEqual(parseISO(shift.date), parseISO(selectedDate)))
+    .sort((a, b) => {
+      // Convert time strings to comparable values for sorting
+      const timeA = a.startTime.split(':').map(Number);
+      const timeB = b.startTime.split(':').map(Number);
+      
+      // Compare hours first
+      if (timeA[0] !== timeB[0]) {
+        return timeA[0] - timeB[0];
+      }
+      
+      // If hours are equal, compare minutes
+      return timeA[1] - timeB[1];
+    });
 
   const isFirstDay = selectedDate === AVAILABLE_DATES[0];
   const isLastDay = selectedDate === AVAILABLE_DATES[AVAILABLE_DATES.length - 1];
