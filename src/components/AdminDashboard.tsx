@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, query, getDocs, orderBy, deleteDoc, doc, updateDoc, where } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
-import { Plus, Save, LogOut, Calendar, Clock, Users, Trash2, Edit, X, ChevronLeft, User, ChevronRight } from 'lucide-react';
+import { Plus, Save, LogOut, Calendar, Clock, Users, Trash2, Edit, X, ChevronLeft, User, ChevronRight, UserMinus, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { format, parseISO, isEqual } from 'date-fns';
@@ -62,6 +62,10 @@ export function AdminDashboard() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [showUserManagement, setShowUserManagement] = useState(false);
   const [deleteUserConfirm, setDeleteUserConfirm] = useState<string | null>(null);
+  const [addingParticipant, setAddingParticipant] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState('');
+  const [selectedUserRole, setSelectedUserRole] = useState('');
+  const [removingParticipant, setRemovingParticipant] = useState<{ shiftId: string; userId: string } | null>(null);
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
 
@@ -239,6 +243,89 @@ export function AdminDashboard() {
     const currentIndex = AVAILABLE_DATES.indexOf(selectedDate);
     if (currentIndex < AVAILABLE_DATES.length - 1) {
       setSelectedDate(AVAILABLE_DATES[currentIndex + 1]);
+    }
+  };
+
+  const handleAddParticipant = async (shiftId: string) => {
+    if (!selectedUser || !selectedUserRole) return;
+
+    try {
+      const shift = shifts.find(s => s.id === shiftId);
+      if (!shift) return;
+
+      const selectedUserData = users.find(u => u.id === selectedUser);
+      if (!selectedUserData) return;
+
+      const shiftRef = doc(db, 'shifts', shiftId);
+      await updateDoc(shiftRef, {
+        [`participants.${selectedUser}`]: {
+          role: selectedUserRole,
+          name: `${selectedUserData.firstName} ${selectedUserData.lastName}`,
+        },
+        currentParticipants: (shift.currentParticipants || 0) + 1
+      });
+
+      // Update local state
+      const updatedShifts = shifts.map(s => {
+        if (s.id === shiftId) {
+          return {
+            ...s,
+            participants: {
+              ...s.participants,
+              [selectedUser]: {
+                role: selectedUserRole,
+                name: `${selectedUserData.firstName} ${selectedUserData.lastName}`,
+              }
+            },
+            currentParticipants: (s.currentParticipants || 0) + 1
+          };
+        }
+        return s;
+      });
+
+      setShifts(updatedShifts);
+      setAddingParticipant(null);
+      setSelectedUser('');
+      setSelectedUserRole('');
+      setSuccess(true);
+    } catch (error) {
+      console.error('Error adding participant:', error);
+    }
+  };
+
+  const handleRemoveParticipant = async (shiftId: string, userId: string) => {
+    try {
+      const shift = shifts.find(s => s.id === shiftId);
+      if (!shift) return;
+
+      const shiftRef = doc(db, 'shifts', shiftId);
+      const updatedParticipants = { ...shift.participants };
+      delete updatedParticipants[userId];
+
+      await updateDoc(shiftRef, {
+        participants: updatedParticipants,
+        currentParticipants: (shift.currentParticipants || 0) - 1
+      });
+
+      // Update local state
+      const updatedShifts = shifts.map(s => {
+        if (s.id === shiftId) {
+          const newParticipants = { ...s.participants };
+          delete newParticipants[userId];
+          return {
+            ...s,
+            participants: newParticipants,
+            currentParticipants: (s.currentParticipants || 0) - 1
+          };
+        }
+        return s;
+      });
+
+      setShifts(updatedShifts);
+      setRemovingParticipant(null);
+      setSuccess(true);
+    } catch (error) {
+      console.error('Error removing participant:', error);
     }
   };
 
@@ -563,7 +650,7 @@ export function AdminDashboard() {
                     {filteredShifts.map((shift) => (
                       <div
                         key={shift.id}
-                        className="bg-white rounded-lg border p-6 relative group"
+                        className="bg-white rounded-lg border p-6 relative"
                       >
                         <div className="absolute top-4 right-4 flex space-x-2">
                           <button
@@ -583,7 +670,7 @@ export function AdminDashboard() {
                         </div>
 
                         {deleteConfirm === shift.id && (
-                          <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center rounded-lg">
+                          <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center rounded-lg z-10">
                             <div className="text-center p-6">
                               <p className="text-lg font-medium mb-4">Sei sicuro di voler eliminare questo turno?</p>
                               <div className="flex justify-center space-x-4">
@@ -599,7 +686,6 @@ export function AdminDashboard() {
                                 >
                                   Annulla
                                 </button>
-                
                               </div>
                             </div>
                           </div>
@@ -617,10 +703,91 @@ export function AdminDashboard() {
                         <div className="space-y-4">
                           <div className="flex items-center justify-between">
                             <h3 className="font-medium text-gray-700">Partecipanti:</h3>
-                            <span className="text-sm bg-[#E2001A] text-white px-2 py-1 rounded-full">
-                              {shift.currentParticipants}/{shift.maxParticipants}
-                            </span>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm bg-[#E2001A] text-white px-2 py-1 rounded-full">
+                                {shift.currentParticipants}/{shift.maxParticipants}
+                              </span>
+                              <button
+                                onClick={() => setAddingParticipant(shift.id)}
+                                className="p-1 text-[#E2001A] hover:bg-red-50 rounded-full"
+                                title="Aggiungi partecipante"
+                              >
+                                <UserPlus className="h-5 w-5" />
+                              </button>
+                            </div>
                           </div>
+
+                          {addingParticipant === shift.id && (
+                            <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                              <h4 className="font-medium text-gray-700">Aggiungi Partecipante</h4>
+                              <div className="space-y-3">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-1">
+                                    Seleziona Utente
+                                  </label>
+                                  <select
+                                    value={selectedUser}
+                                    onChange={(e) => setSelectedUser(e.target.value)}
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-[#E2001A] focus:ring-[#E2001A]"
+                                  >
+                                    <option value="">Seleziona un utente...</option>
+                                    {users
+                                      .filter(u => !shift.participants?.[u.id])
+                                
+                                      .map(u => (
+                                        <option key={u.id} value={u.id}>
+                                          {u.firstName} {u.lastName}
+                                        </option>
+                                      ))
+                                    }
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-1">
+                                    Seleziona Ruolo
+                                  </label>
+                                  <select
+                                    value={selectedUserRole}
+                                    onChange={(e) => setSelectedUserRole(e.target.value)}
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-[#E2001A] focus:ring-[#E2001A]"
+                                  >
+                                    <option value="">Seleziona un ruolo...</option>
+                                    {Object.entries(shift.requiredRoles).map(([role, count]) => {
+                                      const participantsInRole = Object.values(shift.participants || {})
+                                        .filter(p => p.role === role).length;
+                                      if (participantsInRole < count) {
+                                        return (
+                                          <option key={role} value={role}>
+                                            {role} ({participantsInRole}/{count})
+                                          </option>
+                                        );
+                                      }
+                                      return null;
+                                    })}
+                                  </select>
+                                </div>
+                                <div className="flex justify-end space-x-2">
+                                  <button
+                                    onClick={() => {
+                                      setAddingParticipant(null);
+                                      setSelectedUser('');
+                                      setSelectedUserRole('');
+                                    }}
+                                    className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
+                                  >
+                                    Annulla
+                                  </button>
+                                  <button
+                                    onClick={() => handleAddParticipant(shift.id)}
+                                    disabled={!selectedUser || !selectedUserRole}
+                                    className="px-3 py-2 text-sm font-medium text-white bg-[#E2001A] rounded hover:bg-[#c60017] disabled:opacity-50"
+                                  >
+                                    Aggiungi
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
                           {Object.entries(shift.requiredRoles).map(([role, count]) => {
                             const participantsInRole = Object.entries(shift.participants || {})
@@ -638,11 +805,38 @@ export function AdminDashboard() {
                                   </span>
                                 </div>
                                 {participantsInRole.length > 0 && (
-                                  <div className="mt-2 space-y-1">
+                                  <div className="mt-2 space-y-2">
                                     {participantsInRole.map(([userId, participant]) => (
-                                      <div key={userId} className="flex items-center text-sm text-gray-600">
-                                        <User className="h-4 w-4 mr-2 text-[#E2001A]" />
-                                        {participant.name}
+                                      <div key={userId} className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                                        <div className="flex items-center">
+                                          <User className="h-4 w-4 mr-2 text-[#E2001A]" />
+                                          {participant.name}
+                                        </div>
+                                        {removingParticipant?.shiftId === shift.id && 
+                                         removingParticipant?.userId === userId ? (
+                                          <div className="flex items-center space-x-2">
+                                            <button
+                                              onClick={() => handleRemoveParticipant(shift.id, userId)}
+                                              className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                            >
+                                              Conferma
+                                            </button>
+                                            <button
+                                              onClick={() => setRemovingParticipant(null)}
+                                              className="text-gray-600 hover:text-gray-800 text-sm font-medium"
+                                            >
+                                              Annulla
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <button
+                                            onClick={() => setRemovingParticipant({ shiftId: shift.id, userId })}
+                                            className="p-1 text-gray-400 hover:text-red-600 rounded-full hover:bg-gray-100"
+                                            title="Rimuovi partecipante"
+                                          >
+                                            <UserMinus className="h-4 w-4" />
+                                          </button>
+                                        )}
                                       </div>
                                     ))}
                                   </div>

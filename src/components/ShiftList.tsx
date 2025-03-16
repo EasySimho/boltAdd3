@@ -9,6 +9,7 @@ import { it } from 'date-fns/locale';
 
 interface Shift {
   id: string;
+  title: string;
   date: string;
   startTime: string;
   endTime: string;
@@ -210,6 +211,10 @@ export function ShiftList() {
                     className={`rounded-xl shadow-sm border p-4 sm:p-6 transition-all active:scale-[0.98] ${cardClass}`}
                     onClick={() => navigate(`/shifts/${shift.id}`)}
                   >
+                    <h3 className="text-xl font-semibold mb-4 text-[#E2001A]">
+                      {shift.title}
+                    </h3>
+                    
                     <div className="flex items-center mb-4">
                       <Clock className="h-5 w-5 text-[#E2001A] mr-2 flex-shrink-0" />
                       <span className="text-lg font-medium">{shift.startTime} - {shift.endTime}</span>
