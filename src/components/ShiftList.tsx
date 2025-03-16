@@ -26,6 +26,11 @@ interface Shift {
   };
 }
 
+interface ShiftGroup {
+  startTime: string;
+  shifts: Shift[];
+}
+
 const AVAILABLE_DATES = [
   '2025-05-09',
   '2025-05-10',
@@ -98,22 +103,39 @@ export function ShiftList() {
     }
   };
 
-  // Filter shifts by selected date and sort by startTime
-  const filteredShifts = shifts
-    .filter(shift => isEqual(parseISO(shift.date), parseISO(selectedDate)))
-    .sort((a, b) => {
-      // Convert time strings to comparable values for sorting
-      const timeA = a.startTime.split(':').map(Number);
-      const timeB = b.startTime.split(':').map(Number);
-      
-      // Compare hours first
-      if (timeA[0] !== timeB[0]) {
-        return timeA[0] - timeB[0];
+  // Filter shifts by selected date and group by startTime
+  const filteredAndGroupedShifts = React.useMemo(() => {
+    // First filter by date
+    const filteredShifts = shifts.filter(shift => 
+      isEqual(parseISO(shift.date), parseISO(selectedDate))
+    );
+    
+    // Group shifts by startTime
+    const shiftsByTime: Record<string, Shift[]> = {};
+    
+    filteredShifts.forEach(shift => {
+      if (!shiftsByTime[shift.startTime]) {
+        shiftsByTime[shift.startTime] = [];
       }
-      
-      // If hours are equal, compare minutes
-      return timeA[1] - timeB[1];
+      shiftsByTime[shift.startTime].push(shift);
     });
+    
+    // Convert to array and sort by startTime
+    return Object.entries(shiftsByTime)
+      .map(([startTime, shifts]) => ({ startTime, shifts }))
+      .sort((a, b) => {
+        const timeA = a.startTime.split(':').map(Number);
+        const timeB = b.startTime.split(':').map(Number);
+        
+        // Compare hours first
+        if (timeA[0] !== timeB[0]) {
+          return timeA[0] - timeB[0];
+        }
+        
+        // If hours are equal, compare minutes
+        return timeA[1] - timeB[1];
+      });
+  }, [shifts, selectedDate]);
 
   const isFirstDay = selectedDate === AVAILABLE_DATES[0];
   const isLastDay = selectedDate === AVAILABLE_DATES[AVAILABLE_DATES.length - 1];
@@ -202,92 +224,104 @@ export function ShiftList() {
             {format(parseISO(selectedDate), "EEEE d MMMM yyyy", { locale: it })}
           </div>
           
-          {filteredShifts.length === 0 ? (
+          {filteredAndGroupedShifts.length === 0 ? (
             <div className="text-center py-12">
               <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500 text-lg">Nessun turno disponibile per questa data</p>
             </div>
           ) : (
-            <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredShifts.map((shift) => {
-                const isFull = shift.currentParticipants >= shift.maxParticipants;
-                const isUserParticipating = shift.participants?.[auth.currentUser?.uid || ''];
-                const cardClass = isUserParticipating
-                  ? 'bg-blue-50 border-blue-200'
-                  : isFull
-                  ? 'bg-gray-50 border-gray-200'
-                  : 'bg-white hover:shadow-lg';
-
-                return (
-                  <div
-                    key={shift.id}
-                    className={`rounded-xl shadow-sm border p-4 sm:p-6 transition-all active:scale-[0.98] ${cardClass}`}
-                    onClick={() => navigate(`/shifts/${shift.id}`)}
-                  >
-                    <h3 className="text-xl font-semibold mb-4 text-[#E2001A]">
-                      {shift.title}
-                    </h3>
-                    
-                    <div className="flex items-center mb-4">
-                      <Clock className="h-5 w-5 text-[#E2001A] mr-2 flex-shrink-0" />
-                      <span className="text-lg font-medium">{shift.startTime} - {shift.endTime}</span>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      {Object.entries(shift.requiredRoles).map(([role, count]) => {
-                        const participantsInRole = Object.entries(shift.participants || {})
-                          .filter(([_, p]) => p.role === role);
-                        const isFilled = participantsInRole.length >= count;
-
-                        return (
-                          <div key={role} className="bg-white rounded-lg border p-3">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="font-medium text-base">{role}</span>
-                              <div className="flex items-center">
-                                <span className={`${isFilled ? 'text-green-600' : ''} text-base`}>
-                                  {participantsInRole.length}/{count}
-                                </span>
-                                {isFilled && (
-                                  <CheckCircle className="h-4 w-4 text-green-500 ml-2" />
-                                )}
-                              </div>
-                            </div>
-                            {participantsInRole.length > 0 && (
-                              <div className="text-sm text-gray-600 space-y-1.5">
-                                {participantsInRole.map(([_, participant]) => (
-                                  <div key={participant.name} className="flex items-center">
-                                    <User className="h-3 w-3 mr-1.5 text-[#E2001A]" />
-                                    <span className="truncate">{participant.name}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    
-                    <div className="mt-4 pt-4 border-t">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Stato:</span>
-                        {isUserParticipating ? (
-                          <span className="text-sm font-medium text-blue-600">
-                            Iscritto come {isUserParticipating.role}
-                          </span>
-                        ) : isFull ? (
-                          <span className="text-sm font-medium text-gray-600">
-                            Turno completo
-                          </span>
-                        ) : (
-                          <span className="text-sm font-medium text-green-600">
-                            Disponibile
-                          </span>
-                        )}
-                      </div>
-                    </div>
+            <div className="space-y-8">
+              {filteredAndGroupedShifts.map((group) => (
+                <div key={group.startTime} className="space-y-4">
+                  <div className="flex items-center mb-2">
+                    <Clock className="h-5 w-5 text-[#E2001A] mr-2" />
+                    <h3 className="text-lg font-semibold text-gray-800">Turni con inizio ore {group.startTime}</h3>
+                    <div className="flex-1 ml-4 border-t border-gray-200"></div>
                   </div>
-                );
-              })}
+                  
+                  <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {group.shifts.map((shift) => {
+                      const isFull = shift.currentParticipants >= shift.maxParticipants;
+                      const isUserParticipating = shift.participants?.[auth.currentUser?.uid || ''];
+                      const cardClass = isUserParticipating
+                        ? 'bg-blue-50 border-blue-200'
+                        : isFull
+                        ? 'bg-gray-50 border-gray-200'
+                        : 'bg-white hover:shadow-lg';
+
+                      return (
+                        <div
+                          key={shift.id}
+                          className={`rounded-xl shadow-sm border p-4 sm:p-6 transition-all active:scale-[0.98] ${cardClass}`}
+                          onClick={() => navigate(`/shifts/${shift.id}`)}
+                        >
+                          <h3 className="text-xl font-semibold mb-4 text-[#E2001A]">
+                            {shift.title}
+                          </h3>
+                          
+                          <div className="flex items-center mb-4">
+                            <Clock className="h-5 w-5 text-[#E2001A] mr-2 flex-shrink-0" />
+                            <span className="text-lg font-medium">{shift.startTime} - {shift.endTime}</span>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            {Object.entries(shift.requiredRoles).map(([role, count]) => {
+                              const participantsInRole = Object.entries(shift.participants || {})
+                                .filter(([_, p]) => p.role === role);
+                              const isFilled = participantsInRole.length >= count;
+
+                              return (
+                                <div key={role} className="bg-white rounded-lg border p-3">
+                                  <div className="flex justify-between items-center mb-2">
+                                    <span className="font-medium text-base">{role}</span>
+                                    <div className="flex items-center">
+                                      <span className={`${isFilled ? 'text-green-600' : ''} text-base`}>
+                                        {participantsInRole.length}/{count}
+                                      </span>
+                                      {isFilled && (
+                                        <CheckCircle className="h-4 w-4 text-green-500 ml-2" />
+                                      )}
+                                    </div>
+                                  </div>
+                                  {participantsInRole.length > 0 && (
+                                    <div className="text-sm text-gray-600 space-y-1.5">
+                                      {participantsInRole.map(([_, participant]) => (
+                                        <div key={participant.name} className="flex items-center">
+                                          <User className="h-3 w-3 mr-1.5 text-[#E2001A]" />
+                                          <span className="truncate">{participant.name}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          
+                          <div className="mt-4 pt-4 border-t">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">Stato:</span>
+                              {isUserParticipating ? (
+                                <span className="text-sm font-medium text-blue-600">
+                                  Iscritto come {isUserParticipating.role}
+                                </span>
+                              ) : isFull ? (
+                                <span className="text-sm font-medium text-gray-600">
+                                  Turno completo
+                                </span>
+                              ) : (
+                                <span className="text-sm font-medium text-green-600">
+                                  Disponibile
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
