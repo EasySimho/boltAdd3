@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { signInAnonymously } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +18,30 @@ export function UserRegistration() {
     setError('');
 
     try {
+      // Check if user already exists
+      const profilesRef = collection(db, 'profiles');
+      const q = query(
+        profilesRef, 
+        where('firstName', '==', firstName.trim()),
+        where('lastName', '==', lastName.trim())
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        // User exists, sign in with the existing account
+        const existingProfile = querySnapshot.docs[0];
+        const userCredential = await signInAnonymously(auth);
+        
+        await setDoc(doc(db, 'profiles', userCredential.user.uid), {
+          ...existingProfile.data(),
+          lastLoginAt: new Date().toISOString()
+        });
+
+        navigate(existingProfile.data().role === 'admin' ? '/admin' : '/shifts');
+        return;
+      }
+
+      // New user registration
       const userCredential = await signInAnonymously(auth);
       const user = userCredential.user;
 
@@ -25,10 +49,11 @@ export function UserRegistration() {
       const isAdmin = firstName.toLowerCase() === 'admin' && lastName.toLowerCase() === 'admin';
 
       await setDoc(doc(db, 'profiles', user.uid), {
-        firstName,
-        lastName,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         role: isAdmin ? 'admin' : 'user',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString()
       });
 
       // Redirect admin users to the admin dashboard
@@ -50,7 +75,7 @@ export function UserRegistration() {
         </div>
 
         <div className="bg-white rounded-xl shadow-md p-8">
-          <h2 className="text-2xl font-bold text-center mb-8">Registrazione</h2>
+          <h2 className="text-2xl font-bold text-center mb-8">Accedi</h2>
           
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
@@ -91,7 +116,7 @@ export function UserRegistration() {
               {loading ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
               ) : (
-                'Registrati'
+                'Accedi'
               )}
             </button>
           </form>
