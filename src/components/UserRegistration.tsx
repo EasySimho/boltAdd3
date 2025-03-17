@@ -71,7 +71,8 @@ export function UserRegistration() {
         <div className="text-center mb-8">
           <img src="/Emblema_CRI.svg" alt="CRI Logo" className="h-24 w-24 mx-auto mb-6" />
           <h1 className="text-3xl font-bold text-[#E2001A]">Croce Rossa Italiana</h1>
-          <p className="text-gray-600 mt-2">Gestione Turni</p>
+          <p className="text-gray-900 mt-2">Gestione Turni Adunata Alpini</p>
+          <p className="text-gray-600 mt-2">9-10-11 Maggio</p>
         </div>
 
         <div className="bg-white rounded-xl shadow-md p-8">
