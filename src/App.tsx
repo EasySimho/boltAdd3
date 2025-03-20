@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserRegistration } from './components/UserRegistration';
 import { ShiftList } from './components/ShiftList';

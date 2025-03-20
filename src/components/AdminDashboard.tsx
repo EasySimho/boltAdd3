@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, query, getDocs, orderBy, deleteDoc, doc, updateDoc, where } from 'firebase/firestore';
+import { collection, addDoc, query, getDocs, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { Plus, Save, LogOut, Calendar, Clock, Users, Trash2, Edit, X, ChevronLeft, User, ChevronRight, UserMinus, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
