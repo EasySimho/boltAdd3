@@ -284,13 +284,16 @@ export function ShiftList() {
                           className={`rounded-xl shadow-sm border p-4 sm:p-5 transition-all active:scale-[0.98] cursor-pointer ${cardClass}`}
                           onClick={() => navigate(`/shifts/${shift.id}`)}
                         >
-                          <div className="flex justify-between items-start mb-3">
+                          {/* Modified order: Status badge first, then title */}
+                          <div className="flex flex-col mb-3">
+                            <div className="mb-2">
+                              <span className={`text-xs font-medium py-1 px-2 rounded-full border ${statusBadgeClass} whitespace-nowrap`}>
+                                {statusText}
+                              </span>
+                            </div>
                             <h3 className="text-lg sm:text-xl font-semibold text-[#E2001A] break-words hyphens-auto">
                               {shift.title}
                             </h3>
-                            <span className={`text-xs font-medium py-1 px-2 rounded-full border ${statusBadgeClass} ml-2 flex-shrink-0 whitespace-nowrap`}>
-                              {statusText}
-                            </span>
                           </div>
                           
                           <div className="flex items-center mb-4 bg-gray-50 p-2 rounded-lg">
