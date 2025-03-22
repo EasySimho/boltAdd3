@@ -423,8 +423,8 @@ export function AdminDashboard() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${userProfile.role === 'admin'
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-green-100 text-green-800'
+                          ? 'bg-purple-100 text-purple-800'
+                          : 'bg-green-100 text-green-800'
                           }`}>
                           {userProfile.role === 'admin' ? 'Admin' : 'Utente'}
                         </span>
@@ -606,8 +606,8 @@ export function AdminDashboard() {
                       onClick={handlePreviousDay}
                       disabled={isFirstDay}
                       className={`p-2 rounded-lg transition-colors ${isFirstDay
-                          ? 'text-gray-300 cursor-not-allowed'
-                          : 'hover:bg-gray-100 text-gray-600 active:bg-gray-200'
+                        ? 'text-gray-300 cursor-not-allowed'
+                        : 'hover:bg-gray-100 text-gray-600 active:bg-gray-200'
                         }`}
                       title="Giorno precedente"
                     >
@@ -628,8 +628,8 @@ export function AdminDashboard() {
                       onClick={handleNextDay}
                       disabled={isLastDay}
                       className={`p-2 rounded-lg transition-colors ${isLastDay
-                          ? 'text-gray-300 cursor-not-allowed'
-                          : 'hover:bg-gray-100 text-gray-600 active:bg-gray-200'
+                        ? 'text-gray-300 cursor-not-allowed'
+                        : 'hover:bg-gray-100 text-gray-600 active:bg-gray-200'
                         }`}
                       title="Giorno successivo"
                     >
@@ -743,18 +743,21 @@ export function AdminDashboard() {
                                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-[#E2001A] focus:ring-[#E2001A]"
                                   >
                                     <option value="">Seleziona un utente...</option>
+                                    {/* Uso di reduce per eliminare i doppioni durante la creazione dell'array */}
                                     {users
-                                      .filter(u => !shift.participants?.[u.id]) // Esclude utenti già partecipanti
+                                      .reduce((uniqueUsers, user) => {
+                                        // Se l'utente non è già presente nell'array dei risultati e non è già partecipante
+                                        if (!uniqueUsers.some(u => u.id === user.id) && !shift.participants?.[user.id]) {
+                                          uniqueUsers.push(user);
+                                        }
+                                        return uniqueUsers;
+                                      }, [])
                                       .filter(u => {
                                         // Filtra in base alla ricerca
                                         if (!searchQuery) return true;
                                         const fullName = `${u.firstName} ${u.lastName}`.toLowerCase();
                                         return fullName.includes(searchQuery.toLowerCase());
                                       })
-                                      // Rimuove eventuali doppioni basandosi sull'ID
-                                      .filter((user, index, self) =>
-                                        index === self.findIndex(u => u.id === user.id)
-                                      )
                                       // Ordina alfabeticamente per cognome e poi nome
                                       .sort((a, b) => {
                                         const nameA = `${a.lastName} ${a.firstName}`.toLowerCase();
