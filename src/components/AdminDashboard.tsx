@@ -68,6 +68,7 @@ export function AdminDashboard() {
   const [removingParticipant, setRemovingParticipant] = useState<{ shiftId: string; userId: string } | null>(null);
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'admin')) {
@@ -77,18 +78,18 @@ export function AdminDashboard() {
 
     const fetchData = async () => {
       if (authLoading || !user) return;
-      
+
       try {
         // Fetch shifts
         const shiftsRef = collection(db, 'shifts');
         const q = query(shiftsRef, orderBy('date', 'asc'));
         const querySnapshot = await getDocs(q);
-        
+
         const shiftsData = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as Shift[];
-        
+
         setShifts(shiftsData);
 
         // Fetch users
@@ -329,7 +330,7 @@ export function AdminDashboard() {
     }
   };
 
-  const filteredShifts = shifts.filter(shift => 
+  const filteredShifts = shifts.filter(shift =>
     isEqual(parseISO(shift.date), parseISO(selectedDate))
   );
 
@@ -421,16 +422,15 @@ export function AdminDashboard() {
                         {userProfile.lastName}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          userProfile.role === 'admin' 
-                            ? 'bg-purple-100 text-purple-800' 
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${userProfile.role === 'admin'
+                            ? 'bg-purple-100 text-purple-800'
                             : 'bg-green-100 text-green-800'
-                        }`}>
+                          }`}>
                           {userProfile.role === 'admin' ? 'Admin' : 'Utente'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {userProfile.lastLoginAt 
+                        {userProfile.lastLoginAt
                           ? format(parseISO(userProfile.lastLoginAt), "d MMM yyyy HH:mm", { locale: it })
                           : 'Mai'}
                       </td>
@@ -483,7 +483,7 @@ export function AdminDashboard() {
                   </button>
                 )}
               </div>
-              
+
               {success && (
                 <div className="mb-6 p-4 bg-green-100 text-green-700 rounded-md">
                   {isEditing ? 'Turno modificato con successo!' : 'Turno creato con successo!'}
@@ -605,11 +605,10 @@ export function AdminDashboard() {
                     <button
                       onClick={handlePreviousDay}
                       disabled={isFirstDay}
-                      className={`p-2 rounded-lg transition-colors ${
-                        isFirstDay 
-                          ? 'text-gray-300 cursor-not-allowed' 
+                      className={`p-2 rounded-lg transition-colors ${isFirstDay
+                          ? 'text-gray-300 cursor-not-allowed'
                           : 'hover:bg-gray-100 text-gray-600 active:bg-gray-200'
-                      }`}
+                        }`}
                       title="Giorno precedente"
                     >
                       <ChevronLeft className="h-5 w-5" />
@@ -628,11 +627,10 @@ export function AdminDashboard() {
                     <button
                       onClick={handleNextDay}
                       disabled={isLastDay}
-                      className={`p-2 rounded-lg transition-colors ${
-                        isLastDay 
-                          ? 'text-gray-300 cursor-not-allowed' 
+                      className={`p-2 rounded-lg transition-colors ${isLastDay
+                          ? 'text-gray-300 cursor-not-allowed'
                           : 'hover:bg-gray-100 text-gray-600 active:bg-gray-200'
-                      }`}
+                        }`}
                       title="Giorno successivo"
                     >
                       <ChevronRight className="h-5 w-5" />
@@ -690,11 +688,11 @@ export function AdminDashboard() {
                             </div>
                           </div>
                         )}
-                        
+
                         <h3 className="text-xl font-semibold mb-4 text-[#E2001A]">
                           {shift.title}
                         </h3>
-                        
+
                         <div className="flex items-center mb-4">
                           <Clock className="h-5 w-5 text-[#E2001A] mr-2" />
                           <span>{shift.startTime} - {shift.endTime}</span>
@@ -721,6 +719,20 @@ export function AdminDashboard() {
                             <div className="bg-gray-50 rounded-lg p-4 space-y-4">
                               <h4 className="font-medium text-gray-700">Aggiungi Partecipante</h4>
                               <div className="space-y-3">
+                                {/* Aggiunta campo di ricerca */}
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-1">
+                                    Cerca Utente
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="Cerca per nome..."
+                                    value={searchQuery || ''}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-[#E2001A] focus:ring-[#E2001A]"
+                                  />
+                                </div>
+
                                 <div>
                                   <label className="block text-sm font-medium text-gray-600 mb-1">
                                     Seleziona Utente
@@ -732,8 +744,23 @@ export function AdminDashboard() {
                                   >
                                     <option value="">Seleziona un utente...</option>
                                     {users
-                                      .filter(u => !shift.participants?.[u.id])
-                                
+                                      .filter(u => !shift.participants?.[u.id]) // Esclude utenti già partecipanti
+                                      .filter(u => {
+                                        // Filtra in base alla ricerca
+                                        if (!searchQuery) return true;
+                                        const fullName = `${u.firstName} ${u.lastName}`.toLowerCase();
+                                        return fullName.includes(searchQuery.toLowerCase());
+                                      })
+                                      // Rimuove eventuali doppioni basandosi sull'ID
+                                      .filter((user, index, self) =>
+                                        index === self.findIndex(u => u.id === user.id)
+                                      )
+                                      // Ordina alfabeticamente per cognome e poi nome
+                                      .sort((a, b) => {
+                                        const nameA = `${a.lastName} ${a.firstName}`.toLowerCase();
+                                        const nameB = `${b.lastName} ${b.firstName}`.toLowerCase();
+                                        return nameA.localeCompare(nameB);
+                                      })
                                       .map(u => (
                                         <option key={u.id} value={u.id}>
                                           {u.firstName} {u.lastName}
@@ -742,6 +769,7 @@ export function AdminDashboard() {
                                     }
                                   </select>
                                 </div>
+
                                 <div>
                                   <label className="block text-sm font-medium text-gray-600 mb-1">
                                     Seleziona Ruolo
@@ -766,12 +794,14 @@ export function AdminDashboard() {
                                     })}
                                   </select>
                                 </div>
+
                                 <div className="flex justify-end space-x-2">
                                   <button
                                     onClick={() => {
                                       setAddingParticipant(null);
                                       setSelectedUser('');
                                       setSelectedUserRole('');
+                                      setSearchQuery('');
                                     }}
                                     className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
                                   >
@@ -798,9 +828,8 @@ export function AdminDashboard() {
                               <div key={role} className="border rounded-lg p-4">
                                 <div className="flex justify-between items-center mb-2">
                                   <span className="font-medium">{role}</span>
-                                  <span className={`text-sm px-2 py-1 rounded-full ${
-                                    isFilled ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                                  }`}>
+                                  <span className={`text-sm px-2 py-1 rounded-full ${isFilled ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                    }`}>
                                     {participantsInRole.length}/{count}
                                   </span>
                                 </div>
@@ -812,8 +841,8 @@ export function AdminDashboard() {
                                           <User className="h-4 w-4 mr-2 text-[#E2001A]" />
                                           {participant.name}
                                         </div>
-                                        {removingParticipant?.shiftId === shift.id && 
-                                         removingParticipant?.userId === userId ? (
+                                        {removingParticipant?.shiftId === shift.id &&
+                                          removingParticipant?.userId === userId ? (
                                           <div className="flex items-center space-x-2">
                                             <button
                                               onClick={() => handleRemoveParticipant(shift.id, userId)}
