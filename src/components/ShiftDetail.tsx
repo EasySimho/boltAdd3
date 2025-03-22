@@ -367,7 +367,7 @@ export function ShiftDetail() {
         </div>
         
         <div className="text-center text-gray-500 text-xs sm:text-sm py-4">
-          © {new Date().getFullYear()} Croce Rossa Italiana - Comitato di Biella
+          © {new Date().getFullYear()} Croce Rossa Italiana - Comitato di Cossato
         </div>
       </div>
     </div>
